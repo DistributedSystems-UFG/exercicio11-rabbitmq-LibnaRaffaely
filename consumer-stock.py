@@ -4,20 +4,20 @@ import time
 from const import *
 
 
-def consumer_pedidos():
+def consumer_estoque():
     with rabbitpy.Connection(amqp_url()) as conn:
         with conn.channel() as channel:
-            queue = rabbitpy.Queue(channel, QUEUE_PEDIDOS, durable=True, auto_delete=False)
+            queue = rabbitpy.Queue(channel, QUEUE_ESTOQUE, durable=True, auto_delete=False)
             while len(queue) > 0:
                 message = queue.get()
                 if message is None:
                     break
-                pedido = json.loads(message.body.decode())
-                print(f"Processando pedido {pedido['pedido_id']} de {pedido['cliente']}")
+                reposicao = json.loads(message.body.decode())
+                print(f"Atualizando estoque de {reposicao['produto']}")
                 time.sleep(1)
-                print(f"Pedido {pedido['pedido_id']} separado")
+                print(f"Estoque de {reposicao['produto']} atualizado")
                 message.ack()
 
 
 if __name__ == '__main__':
-    consumer_pedidos()
+    consumer_estoque()

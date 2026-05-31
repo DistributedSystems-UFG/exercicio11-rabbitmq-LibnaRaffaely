@@ -1,25 +1,45 @@
 import rabbitpy
+import json
 from const import *
 
-def producer():
-  connection = rabbitpy.Connection('amqp://myuser:abc123@' + RABBITMQ_ADDR + ':5672/my_vhost') # Connect to RabbitMQ server
-  channel = connection.channel()     # Create new channel on the connection
+def producer_pagamentos():
+  pagamentos = [
+    {'pedido_id': 1, 'status': 'pago', 'valor': 49.9},
+    {'pedido_id': 2, 'status': 'pago', 'valor': 36.0},
+    {'pedido_id': 3, 'status': 'pago', 'valor': 15.0}
+  ]
 
-  exchange = rabbitpy.Exchange(channel, 'exchange') # Create an exchange
-  exchange.declare()
+  notificacoes = [
+    {'pedido_id': 1, 'tipo': 'email', 'mensagem': 'Seu pedido foi confirmado'},
+    {'pedido_id': 2, 'tipo': 'sms', 'mensagem': 'Pagamento aprovado'},
+    {'pedido_id': 3, 'tipo': 'email', 'mensagem': 'Pedido em separacao'}
+  ]
 
-  queue1 = rabbitpy.Queue(channel, 'example1', durable=True, auto_delete=False) # Create 1st queue
-  queue1.declare()
+  with rabbitpy.Connection(amqp_url()) as conn:
+    with conn.channel() as channel:
+      exchange = rabbitpy.Exchange(channel, EXCHANGE_NAME, exchange_type='direct')
+      exchange.declare()
 
-  queue2 = rabbitpy.Queue(channel, 'example2', durable=True, auto_delete=False) # Create 2nd queue
-  queue2.declare()
+      queue_pag = rabbitpy.Queue(channel, QUEUE_PAGAMENTOS, durable=True, auto_delete=False)
+      queue_pag.declare()
+      queue_pag.bind(exchange, ROUTING_PAGAMENTOS)
 
-  queue1.bind(exchange, 'example-key1') # Bind queue1 to a single key
-  queue2.bind(exchange, 'example-key2') # Bind queue2 to the same key
+      queue_not = rabbitpy.Queue(channel, QUEUE_NOTIFICACOES, durable=True, auto_delete=False)
+      queue_not.declare()
+      queue_not.bind(exchange, ROUTING_NOTIFICACOES)
 
-  message = rabbitpy.Message(channel, 'Test message')
-  message.publish(exchange, 'example-key1') # Publish the message using the key
-  exchange.delete() 
+      for pagamento in pagamentos:
+        body = json.dumps(pagamento)
+        message = rabbitpy.Message(channel, body)
+        message.publish(exchange, ROUTING_PAGAMENTOS)
+        print(f'Pagamento enviado: {body}')
 
-if __name__ == "__main__":
-  producer()
+      for notificacao in notificacoes:
+        body = json.dumps(notificacao)
+        message = rabbitpy.Message(channel, body)
+        message.publish(exchange, ROUTING_NOTIFICACOES)
+        print(f'Notificacao enviada: {body}')
+
+
+if __name__ == '__main__':
+  producer_pagamentos()
